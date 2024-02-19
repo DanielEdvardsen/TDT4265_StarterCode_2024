@@ -12,7 +12,25 @@ def pre_process_images(X: np.ndarray):
     """
     assert X.shape[1] == 784,\
         f"X.shape[1]: {X.shape[1]}, should be 784"
-    # TODO implement this function (Task 2a)
+    # DONE implement this function (Task 2a)
+    # Normalizing the images to the range (-1,1)
+    # print(X.max(), X.min())
+    # Bias trick, adding a column of ones to the start of X
+    
+    # print(X.shape())
+    
+    X = X.astype(float)
+    
+    X = (X*2)/255 - 1
+    
+    ones_column = np.ones((X.shape[0], 1))
+    X = np.c_[X, ones_column]
+    # print(X.max(), X.min())
+    
+    
+    
+    
+    
     return X
 
 
@@ -24,17 +42,27 @@ def cross_entropy_loss(targets: np.ndarray, outputs: np.ndarray) -> float:
     Returns:
         Cross entropy error (float)
     """
-    # TODO implement this function (Task 2a)
+    # DONE implement this function (Task 2a)
+    # targets = targets.astype(float)
+    # outputs = outputs.astype(float)
+
+    cost = np.mean(-(targets * np.log(outputs) + (1 - targets) * np.log(1 - outputs)))
+    # print(cost, targets.shape[0])
+    # print("means", targets.mean(), outputs.mean())
+    # print("max", targets.max(), outputs.max())
+    # print("min", targets.min(), outputs.min())
+    
     assert targets.shape == outputs.shape,\
         f"Targets shape: {targets.shape}, outputs: {outputs.shape}"
-    return 0
+    
+    return cost
 
 
 class BinaryModel:
 
     def __init__(self):
         # Define number of input nodes
-        self.I = None
+        self.I = 785
         self.w = np.zeros((self.I, 1))
         self.grad = None
 
@@ -45,8 +73,12 @@ class BinaryModel:
         Returns:
             y: output of model with shape [batch size, 1]
         """
-        # TODO implement this function (Task 2a)
-        return None
+        # DONE implement this function (Task 2a)
+        # sigmoid activation function and dot product
+        X = X.astype(float)
+        Y = 1 / (1 + np.exp(-np.dot(X, self.w) ))
+        
+        return Y
 
     def backward(self, X: np.ndarray, outputs: np.ndarray, targets: np.ndarray) -> None:
         """
@@ -56,12 +88,18 @@ class BinaryModel:
             outputs: outputs of model of shape: [batch size, 1]
             targets: labels/targets of each image of shape: [batch size, 1]
         """
-        # TODO implement this function (Task 2a)
+        # DONE implement this function (Task 2a)
         assert targets.shape == outputs.shape,\
             f"Output shape: {outputs.shape}, targets: {targets.shape}"
         self.grad = np.zeros_like(self.w)
         assert self.grad.shape == self.w.shape,\
             f"Grad shape: {self.grad.shape}, w: {self.w.shape}"
+        
+        X = X.astype(float)
+        outputs = outputs.astype(float)
+        targets = targets.astype(float)
+
+        self.grad = -(X.T @ (targets - outputs)) / X.shape[0]
 
     def zero_grad(self) -> None:
         self.grad = None
@@ -75,6 +113,7 @@ def gradient_approximation_test(model: BinaryModel, X: np.ndarray, Y: np.ndarray
     w_orig = np.random.normal(
         loc=0, scale=1/model.w.shape[0]**2, size=model.w.shape)
     epsilon = 1e-3
+    # print("error margin: ", epsilon**2)
     for i in range(w_orig.shape[0]):
         model.w = w_orig.copy()
         orig = w_orig[i].copy()
@@ -84,6 +123,7 @@ def gradient_approximation_test(model: BinaryModel, X: np.ndarray, Y: np.ndarray
         model.w[i] = orig - epsilon
         logits = model.forward(X)
         cost2 = cross_entropy_loss(Y, logits)
+
         gradient_approximation = (cost1 - cost2) / (2 * epsilon)
         model.w[i] = orig
         # Actual gradient
@@ -93,8 +133,10 @@ def gradient_approximation_test(model: BinaryModel, X: np.ndarray, Y: np.ndarray
         assert abs(difference) <= epsilon**2,\
             f"Calculated gradient is incorrect. " \
             f"Approximation: {gradient_approximation}, actual gradient: {model.grad[i,0]}\n" \
+            f"gradient calculated with: {cost1} and {cost2}, {cost1-cost2} divided by 2*{epsilon}" \
             f"If this test fails there could be errors in your cross entropy loss function, " \
             f"forward function or backward function"
+            
 
 
 def main():
@@ -102,7 +144,7 @@ def main():
     X_train, Y_train, *_ = utils.load_binary_dataset(category1, category2)
     X_train = pre_process_images(X_train)
     assert X_train.max(
-    ) <= 1.0, f"The images (X_train) should be normalized to the range [-1, 1]"
+    ) <= 1.0, f"The images (X_train) should be normalized to the range [-1, 1], but the max value was {X_train.max()}"
     assert X_train.min() < 0 and X_train.min() >= - \
         1, f"The images (X_train) should be normalized to the range [-1, 1]"
     assert X_train.shape[1] == 785,\
@@ -111,6 +153,7 @@ def main():
     # Simple test for forward pass. Note that this does not cover all errors!
     model = BinaryModel()
     logits = model.forward(X_train)
+    # print("mean of logits",logits.mean())
     np.testing.assert_almost_equal(
         logits.mean(), .5,
         err_msg="Since the weights are all 0's, the sigmoid activation should be 0.5")
